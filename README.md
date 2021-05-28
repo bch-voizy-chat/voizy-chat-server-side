@@ -1,5 +1,7 @@
 # Voizy chat server side
 
-## The app is built by Node.js with the following libraries:
-### Express.js
-### Body-parser
+### This is a Node.js app that was created by firebase CLI
+
+### the following libraries have been installed:
+#### Express.js
+#### Body-parser
