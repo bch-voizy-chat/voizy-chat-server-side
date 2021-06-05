@@ -179,23 +179,64 @@ app.post("/getuser", async (req, res) => {
 
 
 
-// #### start thread ####
-// create collection threads
-// design thread get structure
-//req.body: threadName, threadTags[],threadDate(),threadPosterUserId, threadPosterPassword threadAudio
-//1- check user id and password and fetch username if valid, if not respond 400
-//2 - add to threads collection, file path?
-//3- respond with get threads
-app.post("/addthread", filesUpload,identifyUser,uploadFile, async (req, res, next) => {
-  //add to threads collection
-  //res.locals.userName
-  //res.locals.url
-  //res.locals.filename
-  //Date.now()
-  //array of tags
-  
-  
+// #### post thread ####
+
+app.post("/addthread", filesUpload,identifyUser,uploadFile, async (req, res) => {
+      await db
+        .collection("threads")
+        .add({
+          threadAudioPath: res.locals.url,
+          threadAudioName: res.locals.fileName,
+          threadPosterId: req.body.userid,
+          threadPosterUserName: res.locals.userName,
+          threadPostDate: Date.now(),
+          threadTags: JSON.parse(req.body.threadtags),
+          threadLikes: 0,
+        })
+        .then((docRef) => {
+          res.status(201).send(
+            JSON.stringify({
+              message: `thread with id: ${docRef.id} created`,
+            })
+          );
+        })
+        .catch((error) =>
+          res.status(400).send(
+            JSON.stringify({
+              message: "an error occured!" + error,
+            })
+          )
+        );
 });
+
+
+// #### get threads ####
+
+app.get("/threads", async (req, res) => {
+  let threadsArray = [];
+  await db
+    .collection("threads")
+    .get()
+    .then((doc) => {
+      doc.forEach((i) => {
+        threadsArray.push({
+          threadId: i.id,
+          threadAudioPath: i.data().threadAudioPath,
+          threadPostDate: i.data().threadPostDate,
+          threadPosterUserName: i.data().threadPosterUserName,
+          threadPostDate: i.data().threadPostDate,
+          threadTags: i.data().threadTags,
+          threadLikes: i.data().threadLikes,
+        });
+      });
+    })
+    .then((e) => res.status(200).send(JSON.stringify(threadsArray)))
+    .catch((err) => res.status(400).send(
+        JSON.stringify({
+          message: "an error occured!" + err,
+        })
+      ));
+})
 
 
 /// Functions ///
@@ -233,7 +274,7 @@ async function identifyUser(req, res, next) {
 // uploading the file
  function uploadFile(req, res, next) {
     if (!req.files.length) {
-    res.send(
+    res.status(401).send(
       JSON.stringify({
         message: "No file!",
       })
@@ -253,7 +294,11 @@ async function identifyUser(req, res, next) {
       },
     });
     blobStream.on("error", (error) => {
-      res.send("Something is wrong! Unable to upload" + error);
+      res.status(400).send(
+        JSON.stringify({
+          message: "an error occured!" + error,
+        })
+      );
       return;
     });
       res.locals.url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${fileName}?alt=media&token=${downloadToken}`;
