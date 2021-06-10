@@ -12,6 +12,7 @@ const app = express();
 
 const admin = require('firebase-admin');
 admin.initializeApp({
+  //credential: admin.credential.applicationDefault(),
   storageBucket: "gs://voizy-chat.appspot.com"
 });
 const bucket = admin
@@ -22,7 +23,19 @@ const db = admin.firestore();
 
 
 
-app.use(cors({ origin: true }));
+app.use(
+  cors({
+    origin: "*",
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Content-Length",
+      "X-Requested-With",
+      "Accept",
+    ],
+    methods: ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
+  })
+);
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 
@@ -129,7 +142,7 @@ app.post("/login", async (req, res) => {
           //log in
           res.status(200).send(
             JSON.stringify({
-              email: req.body.email,
+              userId: results.id,
               password: req.body.password,
             })
           );
@@ -192,6 +205,8 @@ app.post("/addthread", filesUpload,identifyUser,uploadFile, async (req, res) => 
           threadPostDate: Date.now(),
           threadTags: JSON.parse(req.body.threadtags),
           threadLikes: 0,
+          threadResponseCount: 0,
+          threadTitle: req.body.threadTitle,
         })
         .then((docRef) => {
           res.status(201).send(
@@ -227,6 +242,8 @@ app.get("/threads", async (req, res) => {
           threadPostDate: i.data().threadPostDate,
           threadTags: i.data().threadTags,
           threadLikes: i.data().threadLikes,
+          threadResponseCount: i.data().threadResponseCount,
+          threadTitle: i.data().threadTitle
         });
       });
     })
@@ -237,6 +254,171 @@ app.get("/threads", async (req, res) => {
         })
       ));
 })
+
+// #### add response ####
+app.post(
+  "/addresponse",
+  filesUpload,
+  identifyUser,
+  uploadFile,
+  async (req, res, next) => {
+    await db
+      .collection("threads")
+      .doc(req.body.threadId)
+      .get()
+      .then((doc) => {
+        if (!doc.exists) {
+          res.status(401).send(
+            JSON.stringify({
+              message: "no such thread id!",
+            })
+          );
+          return;
+        } else {
+           db
+            .collection("threads")
+            .doc(req.body.threadId)
+            .collection("responses")
+            .add({
+              responseAudioPath: res.locals.url,
+              responseAudioName: res.locals.fileName,
+              responsePosterId: req.body.userid,
+              responsePosterUserName: res.locals.userName,
+              responsePostDate: Date.now(),
+              responseLikes: 0,
+              responseToThreadId: req.body.threadId,
+            })
+            .then((docRef) => {
+              res.status(201).send(
+                JSON.stringify({
+                  message: `response with id: ${docRef.id} created`,
+                })
+              );
+              next();
+            })
+            .catch((error) =>{
+              res.status(400).send(
+                JSON.stringify({
+                  message: "an error occured!" + error,
+                })
+              );
+              return;
+            }
+           );
+          db.collection("threads")
+            .doc(req.body.threadId)
+            .update({
+              threadResponseCount: admin.firestore.FieldValue.increment(1),
+            });
+          return;
+        }
+      });
+  }
+);
+
+// #### get thread + responses ####
+
+app.get("/threads/:threadId", async (req, res) => {
+  let responseArray = [];
+  let thread = {};
+  
+  await db
+    .collection("threads")
+    .doc(req.params.threadId)
+    .get()
+    .then((i) => {
+      thread.threadId = i.id;
+      thread.threadAudioPath = i.data().threadAudioPath;
+      thread.threadPostDate = i.data().threadPostDate;
+      thread.threadPosterUserName = i.data().threadPosterUserName;
+      thread.threadPostDate = i.data().threadPostDate;
+      thread.threadTags = i.data().threadTags;
+      thread.threadLikes = i.data().threadLikes;
+      thread.threadResponseCount = i.data().threadResponseCount;
+      thread.threadTitle= i.data().threadTitle;
+    });
+    
+  await db
+    .collection("threads")
+    .doc(req.params.threadId)
+    .collection("responses")
+    .get()
+    .then((doc) => {
+      doc.forEach((i) => {
+        responseArray.push({
+          responseId: i.id,
+          responseToThreadId: i.data().responseToThreadId,
+          responseAudioPath: i.data().responseAudioPath,
+          responsePostDate: i.data().responsePostDate,
+          responsePosterUserName: i.data().responsePosterUserName,
+          responsePostDate: i.data().responsePostDate,
+          responseLikes: i.data().responseLikes,
+        });
+      });
+    })
+
+    .then((e) => res.status(200).send(JSON.stringify({thread:thread,responses:responseArray})))
+    .catch((err) =>
+      res.status(400).send(
+        JSON.stringify({
+          message: "an error occured!" + err,
+        })
+      )
+    );
+})
+
+// #### Like thread ####
+app.post(
+  "/likeThread",
+  identifyUser,
+  async (req, res) => {
+    db.collection("threads")
+      .doc(req.body.threadId)
+      .update({
+        threadLikes: admin.firestore.FieldValue.increment(1),
+      })
+      .then((i) =>
+        res.status(200).send(
+          JSON.stringify({
+            message: "like added!",
+          })
+        )
+      )
+      .catch((e) =>
+        res.status(400).send(
+          JSON.stringify({
+            message: "an error occured!" + err
+          })
+        )
+      );
+    return
+  })
+
+// #### Like response ####
+app.post("/likeResponse", identifyUser, async (req, res) => {
+  db.collection("threads")
+    .doc(req.body.threadId)
+    .collection("responses")
+    .doc(req.body.responseId)
+    .update({
+      responseLikes: admin.firestore.FieldValue.increment(1),
+    })
+    .then((i) =>
+      res.status(200).send(
+        JSON.stringify({
+          message: "like added!",
+        })
+      )
+    )
+    .catch((e) =>
+      res.status(400).send(
+        JSON.stringify({
+          message: "an error occured!" + err,
+        })
+      )
+    );
+  return;
+});
 
 
 /// Functions ///
