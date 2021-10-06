@@ -1,0 +1,30 @@
+name: The workflow
+on:
+  push:
+    branches:
+      - feature
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+
+      # initializing
+      - name: Initiation message
+        run: echo preparing to install and analyse
+
+      # Installing
+      - name: Installing
+        run: npm install
+
+      # Confirmation
+      - name: Confirming
+        run: echo all done! Looking good!

@@ -1,3 +1,5 @@
+[![The workflow](https://github.com/ark13da/voizy-chat-server-side/actions/workflows/main.yml/badge.svg)](https://github.com/ark13da/voizy-chat-server-side/actions/workflows/main.yml)
+
 # Voizy chat server side
 
 ## Genaral information:
@@ -6,13 +8,8 @@
 
 ### The functionality of the app is simply to start audio discussion threads. anyone can open the threads and responses, but they must login if they wish to post.
 
-
-
 ## Technical details:
 
 ### This is a Node.js app that was created by firebase CLI and admin cloud functions
 
 ### the app makes use of firebase firestore for storing data and firebase storage for storing files
-
-
-
